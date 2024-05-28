@@ -91,7 +91,7 @@ func TestAddSlice(t *testing.T) {
 	sm := NewSliceMap[int, int]()
 
 	// Тестирование добавления нового слайса
-	sm.AddSlice(1, []int{5, 3, 8})
+	sm.AddSliceSortCompact(1, []int{5, 3, 8})
 	if slice := sm.GetKey(1); slice == nil || len(*slice) != 3 {
 		t.Fatalf("Expected 3 elements for key 1, got %d", len(*slice))
 	}
@@ -100,7 +100,7 @@ func TestAddSlice(t *testing.T) {
 	}
 
 	// Тестирование добавления элементов с дубликатами
-	sm.AddSlice(1, []int{3, 7, 2, 2})
+	sm.AddSliceSortCompact(1, []int{3, 7, 2, 2})
 	if slice := sm.GetKey(1); slice == nil || len(*slice) != 5 {
 		t.Fatalf("Expected 5 unique elements for key 1, got %d, %v", len(*slice), *slice)
 	}

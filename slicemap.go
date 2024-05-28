@@ -190,6 +190,26 @@ func (sm *SliceMap[K, V]) AddSlice(key K, values []V) {
 	}
 }
 
+// AddSlice adds multiple values to the slice associated with the given key
+func (sm *SliceMap[K, V]) AddSliceSortCompact(key K, values []V) {
+	sm.Lock()
+	defer sm.Unlock()
+
+	slices.Sort(values)
+	values = slices.Compact(values)
+
+	if slice, was := sm.data[key]; !was {
+		// Если ключа нет, просто копируем values
+		ns := make([]V, len(values))
+		copy(ns, values)
+		sm.data[key] = &ns
+	} else {
+		//sort.Slice(values, func(i, j int) bool { return values[i] < values[j] })
+		// Если ключ есть, объединяем новые и старые значения, сохраняя уникальность и порядок
+		*slice = mergeUniqueSorted(*slice, values)
+	}
+}
+
 // mergeUniqueSorted объединяет два отсортированных слайса в один уникальный отсортированный слайс
 func mergeUniqueSorted[V constraints.Ordered](a, b []V) []V {
 	result := make([]V, 0, len(a)+len(b))
