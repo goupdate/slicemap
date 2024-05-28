@@ -1,6 +1,7 @@
 package slicemap
 
 import (
+	"sort"
 	"testing"
 )
 
@@ -83,5 +84,39 @@ func BenchmarkDelete(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		sm.Delete(1, i)
+	}
+}
+
+func TestAddSlice(t *testing.T) {
+	sm := NewSliceMap[int, int]()
+
+	// Тестирование добавления нового слайса
+	sm.AddSlice(1, []int{5, 3, 8})
+	if slice := sm.GetKey(1); slice == nil || len(*slice) != 3 {
+		t.Fatalf("Expected 3 elements for key 1, got %d", len(*slice))
+	}
+	if !sort.IntsAreSorted(*sm.GetKey(1)) {
+		t.Errorf("Slice for key 1 should be sorted")
+	}
+
+	// Тестирование добавления элементов с дубликатами
+	sm.AddSlice(1, []int{3, 7, 2, 2})
+	if slice := sm.GetKey(1); slice == nil || len(*slice) != 5 {
+		t.Fatalf("Expected 5 unique elements for key 1, got %d, %v", len(*slice), *slice)
+	}
+	expectedSlice := []int{2, 3, 5, 7, 8}
+	for i, v := range *sm.GetKey(1) {
+		if v != expectedSlice[i] {
+			t.Errorf("Expected element %d at index %d, got %d", expectedSlice[i], i, v)
+		}
+	}
+
+	// Тестирование добавления слайса к новому ключу
+	sm.AddSlice(2, []int{22, 6, 1})
+	if slice := sm.GetKey(2); slice == nil || len(*slice) != 3 {
+		t.Fatalf("Expected 3 elements for key 2, got %d", len(*slice))
+	}
+	if !sort.IntsAreSorted(*sm.GetKey(2)) {
+		t.Errorf("Slice for key 2 should be sorted")
 	}
 }

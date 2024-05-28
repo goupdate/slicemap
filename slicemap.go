@@ -1,6 +1,7 @@
 package slicemap
 
 import (
+	"slices"
 	"sort"
 	"sync"
 
@@ -174,45 +175,47 @@ func (sm *SliceMap[K, V]) AddSlice(key K, values []V) {
 	sm.Lock()
 	defer sm.Unlock()
 
-	_, was := sm.data[key]
-	if !was {
-		ns := make([]V, 0, len(values))
-		ns = append(ns, values...)
-		sm.data[key] = &ns
-		return
-	}
+	slices.Sort(values)
+	values = slices.Compact(values)
 
-	for _, value := range values {
-		sm.addWithoutLock(key, value) // Use the internal add method to handle each value
+	if slice, was := sm.data[key]; !was {
+		// Если ключа нет, просто копируем values
+		ns := make([]V, len(values))
+		copy(ns, values)
+		sm.data[key] = &ns
+	} else {
+		//sort.Slice(values, func(i, j int) bool { return values[i] < values[j] })
+		// Если ключ есть, объединяем новые и старые значения, сохраняя уникальность и порядок
+		*slice = mergeUniqueSorted(*slice, values)
 	}
 }
 
-// addWithoutLock handles the addition of a single value without locking (helper function)
-func (sm *SliceMap[K, V]) addWithoutLock(key K, value V) {
-	if slice, ok := sm.data[key]; ok {
-		if len(*slice) > 0 {
-			if value < (*slice)[0] {
-				*slice = append([]V{value}, *slice...)
-				return
-			} else if value > (*slice)[len(*slice)-1] {
-				*slice = append(*slice, value)
-				return
-			} else if (*slice)[0] == value || (*slice)[len(*slice)-1] == value {
-				return // Value already exists
-			}
+// mergeUniqueSorted объединяет два отсортированных слайса в один уникальный отсортированный слайс
+func mergeUniqueSorted[V constraints.Ordered](a, b []V) []V {
+	result := make([]V, 0, len(a)+len(b))
+	i, j := 0, 0
+	for i < len(a) && j < len(b) {
+		if a[i] < b[j] {
+			result = append(result, a[i])
+			i++
+		} else if a[i] > b[j] {
+			result = append(result, b[j])
+			j++
+		} else {
+			result = append(result, a[i]) // Оба значения равны, добавляем один раз
+			i++
+			j++
 		}
-
-		i := sort.Search(len(*slice), func(i int) bool { return (*slice)[i] >= value })
-		if i < len(*slice) && (*slice)[i] == value {
-			return // Value already exists
-		}
-
-		*slice = append(*slice, value)
-		copy((*slice)[i+1:], (*slice)[i:])
-		(*slice)[i] = value
-	} else {
-		sm.data[key] = &[]V{value}
 	}
+
+	// Добавляем оставшиеся элементы
+	for ; i < len(a); i++ {
+		result = append(result, a[i])
+	}
+	for ; j < len(b); j++ {
+		result = append(result, b[j])
+	}
+	return result
 }
 
 // GetStorage returns a reference to the internal map
