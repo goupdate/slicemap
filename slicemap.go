@@ -168,3 +168,61 @@ func (sm *SliceMap[K, V]) Exist(key K, value V) bool {
 	}
 	return false
 }
+
+// AddSlice adds multiple values to the slice associated with the given key
+func (sm *SliceMap[K, V]) AddSlice(key K, values []V) {
+	sm.Lock()
+	defer sm.Unlock()
+
+	_, was := sm.data[key]
+	if !was {
+		ns := make([]V, len(values))
+		ns = append(ns, values...)
+		sm.data[key] = &ns
+		return
+	}
+
+	for _, value := range values {
+		sm.addWithoutLock(key, value) // Use the internal add method to handle each value
+	}
+}
+
+// addWithoutLock handles the addition of a single value without locking (helper function)
+func (sm *SliceMap[K, V]) addWithoutLock(key K, value V) {
+	if slice, ok := sm.data[key]; ok {
+		if len(*slice) > 0 {
+			if value < (*slice)[0] {
+				*slice = append([]V{value}, *slice...)
+				return
+			} else if value > (*slice)[len(*slice)-1] {
+				*slice = append(*slice, value)
+				return
+			} else if (*slice)[0] == value || (*slice)[len(*slice)-1] == value {
+				return // Value already exists
+			}
+		}
+
+		i := sort.Search(len(*slice), func(i int) bool { return (*slice)[i] >= value })
+		if i < len(*slice) && (*slice)[i] == value {
+			return // Value already exists
+		}
+
+		*slice = append(*slice, value)
+		copy((*slice)[i+1:], (*slice)[i:])
+		(*slice)[i] = value
+	} else {
+		sm.data[key] = &[]V{value}
+	}
+}
+
+// GetStorage returns a reference to the internal map
+// dont forget use RLock, RUnlock !
+func (sm *SliceMap[K, V]) GetStorageNotLocked() (*map[K]*[]V, *sync.RWMutex) {
+	// Возвращаем указатель на мьютекс и данные
+	return &sm.data, &sm.RWMutex
+}
+
+// GetMutex returns a reference to the internal mutex
+func (sm *SliceMap[K, V]) GetMutex() *sync.RWMutex {
+	return &sm.RWMutex
+}
