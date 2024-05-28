@@ -176,7 +176,7 @@ func (sm *SliceMap[K, V]) AddSlice(key K, values []V) {
 
 	_, was := sm.data[key]
 	if !was {
-		ns := make([]V, len(values))
+		ns := make([]V, 0, len(values))
 		ns = append(ns, values...)
 		sm.data[key] = &ns
 		return
