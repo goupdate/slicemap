@@ -1,2 +1,8 @@
+github.com/goupdate/deadlock v0.5.3 h1:0eMENJbBsiVNcSgGQlLGS9R/vUc3LGn8vRQ6hO4Hv9M=
+github.com/goupdate/deadlock v0.5.3/go.mod h1:Ur8zV3dfhON70dKZzLkg4KQcwpOjw9ubU1r14/08bJ0=
+github.com/petermattis/goid v0.0.0-20240607163614-bb94eb51e7a7 h1:CtBLeckhC0zAXgp5V8uR30CNYH0JgCJoxCg5+6i2zQk=
+github.com/petermattis/goid v0.0.0-20240607163614-bb94eb51e7a7/go.mod h1:pxMtw7cyUw6B2bRH0ZBANSPg+AoSud1I1iyJHI69jH4=
 golang.org/x/exp v0.0.0-20240525044651-4c93da0ed11d h1:N0hmiNbwsSNwHBAvR3QB5w25pUwH4tK0Y/RltD1j1h4=
 golang.org/x/exp v0.0.0-20240525044651-4c93da0ed11d/go.mod h1:XtvwrStGgqGPLc4cjQfWqZHG1YFdYs6swckp8vpsjnc=
+golang.org/x/exp v0.0.0-20240604190554-fc45aab8b7f8 h1:LoYXNGAShUG3m/ehNk4iFctuhGX/+R1ZpfJ4/ia80JM=
+golang.org/x/exp v0.0.0-20240604190554-fc45aab8b7f8/go.mod h1:jj3sYF3dwk5D+ghuXyeI3r5MFf+NT2An6/9dOA95KSI=

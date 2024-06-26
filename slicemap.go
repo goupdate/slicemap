@@ -3,14 +3,14 @@ package slicemap
 import (
 	"slices"
 	"sort"
-	"sync"
 
+	"github.com/goupdate/deadlock"
 	"golang.org/x/exp/constraints"
 )
 
 // SliceMap is a map of slices of ordered values
 type SliceMap[K constraints.Ordered, V constraints.Ordered] struct {
-	sync.RWMutex
+	deadlock.RWMutex
 	data map[K]*[]V
 }
 
@@ -240,12 +240,12 @@ func mergeUniqueSorted[V constraints.Ordered](a, b []V) []V {
 
 // GetStorage returns a reference to the internal map
 // dont forget use RLock, RUnlock !
-func (sm *SliceMap[K, V]) GetStorageNotLocked() (*map[K]*[]V, *sync.RWMutex) {
+func (sm *SliceMap[K, V]) GetStorageNotLocked() (*map[K]*[]V, *deadlock.RWMutex) {
 	// Возвращаем указатель на мьютекс и данные
 	return &sm.data, &sm.RWMutex
 }
 
 // GetMutex returns a reference to the internal mutex
-func (sm *SliceMap[K, V]) GetMutex() *sync.RWMutex {
+func (sm *SliceMap[K, V]) GetMutex() *deadlock.RWMutex {
 	return &sm.RWMutex
 }
