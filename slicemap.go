@@ -3,30 +3,25 @@ package slicemap
 import (
 	"slices"
 	"sort"
+	"sync"
 
-	"github.com/goupdate/deadlock"
 	"golang.org/x/exp/constraints"
 )
 
 // SliceMap is a map of slices of ordered values
 type SliceMap[K constraints.Ordered, V constraints.Ordered] struct {
-	deadlock.RWMutex
-	data map[K]*[]V
+	data sync.Map
 }
 
 // NewSliceMap creates a new SliceMap
 func NewSliceMap[K, V constraints.Ordered]() *SliceMap[K, V] {
-	return &SliceMap[K, V]{
-		data: make(map[K]*[]V),
-	}
+	return &SliceMap[K, V]{}
 }
 
 // Add adds a value to the slice associated with the given key
 func (sm *SliceMap[K, V]) Add(key K, value V) {
-	sm.Lock()
-	defer sm.Unlock()
-
-	if slice, ok := sm.data[key]; ok {
+	if slice_, ok := sm.data.Load(key); ok {
+		slice := slice_.(*[]V)
 		if len(*slice) > 0 {
 			if value < (*slice)[0] {
 				// Insert at the beginning
@@ -54,29 +49,27 @@ func (sm *SliceMap[K, V]) Add(key K, value V) {
 		(*slice)[i] = value
 	} else {
 		// Create a new slice and add value
-		sm.data[key] = &[]V{value}
+		sm.data.Store(key, &[]V{value})
 	}
 }
 
 // Delete removes a value from the slice associated with the given key
 func (sm *SliceMap[K, V]) Delete(key K, value V) {
-	sm.Lock()
-	defer sm.Unlock()
-
-	if slice, ok := sm.data[key]; ok {
+	if slice_, ok := sm.data.Load(key); ok {
+		slice := slice_.(*[]V)
 		if len(*slice) > 0 {
 			if value == (*slice)[0] {
 				// Remove from the beginning
 				*slice = (*slice)[1:]
 				if len(*slice) == 0 {
-					delete(sm.data, key)
+					sm.data.Delete(key)
 				}
 				return
 			} else if value == (*slice)[len(*slice)-1] {
 				// Remove from the end
 				*slice = (*slice)[:len(*slice)-1]
 				if len(*slice) == 0 {
-					delete(sm.data, key)
+					sm.data.Delete(key)
 				}
 				return
 			} else if value < (*slice)[0] || value > (*slice)[len(*slice)-1] {
@@ -89,7 +82,7 @@ func (sm *SliceMap[K, V]) Delete(key K, value V) {
 			// Remove the element at index i
 			*slice = append((*slice)[:i], (*slice)[i+1:]...)
 			if len(*slice) == 0 {
-				delete(sm.data, key)
+				sm.data.Delete(key)
 			}
 		}
 	}
@@ -97,67 +90,55 @@ func (sm *SliceMap[K, V]) Delete(key K, value V) {
 
 // DeleteKey removes the key and its associated slice from the map
 func (sm *SliceMap[K, V]) DeleteKey(key K) {
-	sm.Lock()
-	defer sm.Unlock()
-
-	delete(sm.data, key)
+	sm.data.Delete(key)
 }
 
 // Count returns the total number of elements in all slices
 func (sm *SliceMap[K, V]) Count() int64 {
-	sm.RLock()
-	defer sm.RUnlock()
-
 	var count int64
-	for _, slice := range sm.data {
+	sm.data.Range(func(k, v interface{}) bool {
+		slice := v.(*[]V)
 		count += int64(len(*slice))
-	}
+		return true
+	})
 	return count
 }
 
 // GetKey returns the slice associated with the given key
 func (sm *SliceMap[K, V]) GetKey(key K) *[]V {
-	sm.RLock()
-	defer sm.RUnlock()
-
-	if slice, ok := sm.data[key]; ok {
-		return slice
+	if slice_, ok := sm.data.Load(key); ok {
+		return slice_.(*[]V)
 	}
 	return nil
 }
 
 // IterateValues iterates over all key-value pairs in the map
 func (sm *SliceMap[K, V]) IterateValues(f func(K, V) bool) {
-	sm.RLock()
-	defer sm.RUnlock()
-
-	for k, slice := range sm.data {
+	sm.data.Range(func(k, slice_ interface{}) bool {
+		slice := slice_.(*[]V)
 		for _, v := range *slice {
-			if !f(k, v) {
-				return
+			if !f(k.(K), v) {
+				return false
 			}
 		}
-	}
+		return true
+	})
 }
 
 // IterateKeys iterates over all keys in the map
 func (sm *SliceMap[K, V]) IterateKeys(f func(K) bool) {
-	sm.RLock()
-	defer sm.RUnlock()
-
-	for k := range sm.data {
-		if !f(k) {
-			return
+	sm.data.Range(func(k, _ interface{}) bool {
+		if !f(k.(K)) {
+			return false
 		}
-	}
+		return true
+	})
 }
 
 // Exist checks if the value v exists for the key k
 func (sm *SliceMap[K, V]) Exist(key K, value V) bool {
-	sm.RLock()
-	defer sm.RUnlock()
-
-	if slice, ok := sm.data[key]; ok {
+	if slice_, ok := sm.data.Load(key); ok {
+		slice := slice_.(*[]V)
 		if len(*slice) == 0 {
 			return false
 		}
@@ -172,41 +153,42 @@ func (sm *SliceMap[K, V]) Exist(key K, value V) bool {
 
 // AddSlice adds multiple values to the slice associated with the given key
 func (sm *SliceMap[K, V]) AddSlice(key K, values []V) {
-	sm.Lock()
-	defer sm.Unlock()
-
 	slices.Sort(values)
 	values = slices.Compact(values)
 
-	if slice, was := sm.data[key]; !was {
+	slice_, was := sm.data.Load(key)
+
+	if !was {
 		// Если ключа нет, просто копируем values
 		ns := make([]V, len(values))
 		copy(ns, values)
-		sm.data[key] = &ns
+		sm.data.Store(key, &ns)
 	} else {
 		//sort.Slice(values, func(i, j int) bool { return values[i] < values[j] })
 		// Если ключ есть, объединяем новые и старые значения, сохраняя уникальность и порядок
+		slice := slice_.(*[]V)
 		*slice = mergeUniqueSorted(*slice, values)
+		sm.data.Store(key, slice)
 	}
 }
 
 // AddSlice adds multiple values to the slice associated with the given key
 func (sm *SliceMap[K, V]) AddSliceSortCompact(key K, values []V) {
-	sm.Lock()
-	defer sm.Unlock()
-
 	slices.Sort(values)
 	values = slices.Compact(values)
 
-	if slice, was := sm.data[key]; !was {
+	slice_, was := sm.data.Load(key)
+	if !was {
 		// Если ключа нет, просто копируем values
 		ns := make([]V, len(values))
 		copy(ns, values)
-		sm.data[key] = &ns
+		sm.data.Store(key, &ns)
 	} else {
 		//sort.Slice(values, func(i, j int) bool { return values[i] < values[j] })
 		// Если ключ есть, объединяем новые и старые значения, сохраняя уникальность и порядок
+		slice := slice_.(*[]V)
 		*slice = mergeUniqueSorted(*slice, values)
+		sm.data.Store(key, slice)
 	}
 }
 
@@ -228,7 +210,6 @@ func mergeUniqueSorted[V constraints.Ordered](a, b []V) []V {
 		}
 	}
 
-	// Добавляем оставшиеся элементы
 	for ; i < len(a); i++ {
 		result = append(result, a[i])
 	}
@@ -236,16 +217,4 @@ func mergeUniqueSorted[V constraints.Ordered](a, b []V) []V {
 		result = append(result, b[j])
 	}
 	return result
-}
-
-// GetStorage returns a reference to the internal map
-// dont forget use RLock, RUnlock !
-func (sm *SliceMap[K, V]) GetStorageNotLocked() (*map[K]*[]V, *deadlock.RWMutex) {
-	// Возвращаем указатель на мьютекс и данные
-	return &sm.data, &sm.RWMutex
-}
-
-// GetMutex returns a reference to the internal mutex
-func (sm *SliceMap[K, V]) GetMutex() *deadlock.RWMutex {
-	return &sm.RWMutex
 }
