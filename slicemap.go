@@ -5,14 +5,12 @@ import (
 	"sort"
 	"sync"
 
-	"github.com/goupdate/deadlock"
-
 	"golang.org/x/exp/constraints"
 )
 
 // SliceMap is a map of slices of ordered values
 type SliceMap[K constraints.Ordered, V constraints.Ordered] struct {
-	mutex.RWMutex
+	sync.RWMutex
 	data sync.Map
 }
 
