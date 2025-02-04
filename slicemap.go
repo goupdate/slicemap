@@ -12,7 +12,7 @@ import (
 
 // SliceMap is a map of slices of ordered values
 type SliceMap[K constraints.Ordered, V constraints.Ordered] struct {
-	deadlock.RWMutex
+	mutex.RWMutex
 	data sync.Map
 }
 
